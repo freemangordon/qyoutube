@@ -246,7 +246,6 @@ public:
         
         foreach (QString part, parts) {
             part = unescape(part);
-            part.replace(QRegExp("(^|&)sig="), "&signature=");
             QStringList splitPart = part.split("url=");
 
             if (!splitPart.isEmpty()) {
@@ -259,11 +258,7 @@ public:
                 QUrlQuery query(url);
 
                 foreach (const QString &param, params) {
-                    query.addQueryItem(param.section('=', 0, 0), param.section('=', -1));
-                }
-
-                if (!query.hasQueryItem("signature")) {
-                    query.addQueryItem("signature", splitPart.first().section("signature=", 1, 1).section('&', 0, 0));
+                    query.addQueryItem(param.section('=', 0, 0), param.section('=', 1));
                 }
 
                 url.setQuery(query);
@@ -272,11 +267,7 @@ public:
                 format["url"] = url;
 #else
                 foreach (const QString &param, params) {
-                    url.addQueryItem(param.section('=', 0, 0), param.section('=', -1));
-                }
-
-                if (!url.hasQueryItem("signature")) {
-                    url.addQueryItem("signature", splitPart.first().section("signature=", 1, 1).section('&', 0, 0));
+                    url.addQueryItem(param.section('=', 0, 0), param.section('=', 1));
                 }
 
                 Format format = formatHash.value(url.queryItemValue("itag"));
@@ -321,10 +312,23 @@ public:
             else
               sp = "signature";
 
-            part.replace(QRegExp("(^|&)s="), "&" + sp + "=");
-            QString oldSig = part.section(sp + "=", 1, 1).section('&', 0, 0);
+            if (QRegExp("(^|&)s=").indexIn(part) != -1)
+            {
+              QString oldSig;
 
-            part.replace(oldSig, decryptionFunction.call(QScriptValue(), QScriptValueList() << oldSig).toString());
+              if (part.startsWith("s="))
+              {
+                oldSig = part.section("s=", 1, 1).section('&', 0, 0);
+                part.replace(0,2 , sp + "=");
+              }
+              else
+              {
+                oldSig = part.section("&s=", 1, 1).section('&', 0, 0);
+                part.replace(QRegExp("&s="), "&" + sp + "=");
+              }
+
+              part.replace(oldSig, decryptionFunction.call(QScriptValue(), QScriptValueList() << oldSig).toString());
+            }
 
             QStringList splitPart = part.split("url=");
 
@@ -334,11 +338,12 @@ public:
                 params.removeDuplicates();
 
                 QUrl url(urlString.left(urlString.indexOf('?')));
+
 #if QT_VERSION >= 0x050000
                 QUrlQuery query(url);
 
                 foreach (const QString &param, params) {
-                    query.addQueryItem(param.section('=', 0, 0), param.section('=', -1));
+                    query.addQueryItem(param.section('=', 0, 0), param.section('=', 1));
                 }
 
                 if (!query.hasQueryItem(sp)) {
@@ -413,7 +418,6 @@ public:
         else {
             response = response.section("url_encoded_fmt_stream_map=", 1, 1);
             QString separator = response.left(response.indexOf('%'));
-
             if ((separator == "s") || (response.contains("%26s%3D"))) {
 #ifdef QYOUTUBE_DEBUG
                 qDebug() << "QYouTube::StreamsRequestPrivate::_q_onVideoInfoLoaded: Video has encrypted signatures. \
@@ -466,9 +470,11 @@ public:
             response = response.section("url_encoded_fmt_stream_map\":\"", 1, 1).section("\",\"", 0, 0)
                                                                                 .trimmed().replace("\\u0026", "&")
                                                                                 .remove(QRegExp("itag=\\d+"));
-        
-            if (response.contains("sig=")) {
+
+            if (response.startsWith("sig%3D", Qt::CaseInsensitive) ||
+                response.contains("%26sig%3D", Qt::CaseInsensitive)) {
                 extractVideoStreams();
+                return;
             }
             else {        
                 bool ok;
