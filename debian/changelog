@@ -1,3 +1,9 @@
+qyoutube (0.1.9-2) unstable; urgency=low
+
+  * Fix signiture parsing algorithm
+
+ -- Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>  Sun, 01 Sep 2019 18:23:51 +0300
+
 qyoutube (0.1.9-1) unstable; urgency=low
 
   * Fix for the latest base.js changes
